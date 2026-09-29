@@ -4,24 +4,25 @@ A replacement for the retired Windows 3D Viewer, built on [Babylon.js](https://w
 
 - **Desktop app** (Tauri 2): opens STL, OBJ, glTF/GLB, FBX, PLY, Gaussian splats (`.splat`, `.spz`, `.sog`), USD/USDZ, BVH and `.babylon` files, plus STEP (`.step`, `.stp`), IGES (`.iges`, `.igs`) and OpenCascade BREP CAD models. It supports double-click file associations, drag and drop, an Open dialog, a grid, wireframe mode, model info (size W×D×H, vertices, triangles) and animation playback.
 - **Explorer Preview pane** (Alt+P): an interactive preview of the same formats. It's a native COM preview handler that hosts WebView2 and runs the same viewer bundle.
-- **Explorer thumbnails**: STL, OBJ, glTF/GLB, PLY and `.splat` thumbnails, drawn by a small CPU rasterizer (no GPU or browser needed, ~10–50 ms per file).
+- **Explorer thumbnails**: STL, OBJ, glTF/GLB, PLY and `.splat` thumbnails, drawn by a small CPU rasterizer (no GPU or browser needed, ~10–50 ms per file). STEP, IGES and BREP thumbnails are tessellated by OpenCascade running in [wasmtime](https://wasmtime.dev/) inside the DLL (~0.1–0.5 s per file).
 
 ```
 viewer/       Babylon.js viewer (TypeScript + Vite), shared by the app and the preview pane
   src/stepLoader.ts  STEP/IGES/BREP loader plugin; OpenCascade (occt-import-js) runs in a Web Worker
 src-tauri/    Desktop app: window, native Open dialog, model:// file protocol, installer config
 shell/        babylon_shell.dll: preview handler + thumbnail provider (Rust, windows-rs, webview2-com)
-  src/model/    geometry readers for thumbnails (STL, OBJ, PLY, glTF, splat)
+  src/model/    geometry readers for thumbnails (STL, OBJ, PLY, glTF, splat; cad.rs: STEP/IGES/BREP)
   src/render.rs CPU rasterizer for thumbnails
   examples/     thumbnail + shelltest: exercise the DLL the way Explorer does
-scripts/      make-samples.mjs (test models), register-dev.ps1 (dev registration)
+scripts/      make-samples.mjs (test models), register-dev.ps1 (dev registration),
+              build-occt.mjs (prepares the OpenCascade kernel for the DLL)
 samples/      generated test models
 ```
 
 ## Requirements
 
 - Windows 10/11 x64 with the WebView2 runtime (preinstalled on Windows 11)
-- Node.js 20+ and Rust (MSVC toolchain) with the Visual Studio C++ build tools
+- Node.js 20+ and Rust 1.94+ (MSVC toolchain) with the Visual Studio C++ build tools
 
 ## Build
 
@@ -36,9 +37,9 @@ npm run build
 This builds the viewer bundle and `babylon_shell.dll`, then the app, then the installer at
 `target/release/bundle/nsis/Babylon Viewer_<version>_x64-setup.exe`. It's a per-user install, so no admin rights are needed. The installer:
 
-1. installs the app plus `shell/babylon_shell.dll` and `viewer/` (the bundle the preview pane loads)
+1. installs the app plus `shell/babylon_shell.dll`, `shell/occt.wasm` (the CAD kernel for thumbnails) and `viewer/` (the bundle the preview pane loads)
 2. associates the file types with the app
-3. runs `regsvr32` on the DLL to register the preview handler and thumbnail provider under HKCU
+3. runs `regsvr32` on the DLL to register the preview handler and thumbnail provider under HKCU. Registration also compiles the CAD kernel once (a few seconds) into `%LOCALAPPDATA%\BabylonViewer\cache`, so the first STEP thumbnail is fast
 
 Uninstalling reverses all three.
 
@@ -78,6 +79,8 @@ cargo run --release -p babylon-shell --example thumbnail -- out 256 samples/toru
 cargo test
 ```
 
+The model readers and rasterizer also build and test outside Windows (`cargo test -p babylon-shell --lib`). The STEP tests and CAD thumbnails in the `thumbnail` example need the kernel first: `npm run build:occt` writes `target/occt/occt.wasm`.
+
 ### Troubleshooting the shell extension
 
 - To turn on logging, create an empty file at `%USERPROFILE%\AppData\LocalLow\BabylonViewer\shell.log` (LocalLow, because Explorer runs preview handlers at low integrity), or set `BABYLON_SHELL_LOG` to a log path. The DLL then logs COM calls, served requests, WebView2 errors and the viewer's load result. Delete the file to turn logging off.
@@ -91,9 +94,11 @@ cargo test
 - Thumbnails show geometry and base colors only; textures are ignored. Draco- or meshopt-compressed glTF and `.gltf` files with external `.bin` buffers fall back to the default icon. The Preview pane shows all of them.
 - Babylon.js fetches decoders for Draco, KTX2, meshopt and USD from its CDN on first use, so those files need a network connection. Plain STL, OBJ, glTF, FBX, PLY, splat and STEP/IGES/BREP files work fully offline.
 - 3MF isn't supported yet, because Babylon.js has no 3MF loader.
-- STEP, IGES and BREP files have no thumbnails yet (the CPU renderer has no CAD kernel); the Preview pane and the app show them fully. They're tessellated on open: finer in the app, coarser (faster) in the Preview pane. Sizes are shown in millimetres.
+- STEP, IGES and BREP files are tessellated on open: finer in the app, coarser (faster) in the Preview pane and thumbnails. Sizes are shown in millimetres. Assemblies whose parts live in separate files show only what the main file contains, and CAD thumbnails give up after 30 seconds.
 
 ## CAD support and licensing
 
 STEP/IGES/BREP files are read by [occt-import-js](https://github.com/kovacsv/occt-import-js), a WebAssembly build of [Open CASCADE Technology](https://dev.opencascade.org/). Both are licensed under the LGPL-2.1. The kernel ships unmodified as a separate file, `viewer/assets/occt-import-js-*.wasm`, which can be replaced with another build. Their license texts are installed in `licenses/`. It's only fetched when a CAD file is opened, so other formats load as fast as before.
+
+The thumbnail provider runs the same kernel as `shell/occt.wasm`. `scripts/build-occt.mjs` derives it from the package's `.wasm`: it restores the import and export names that Emscripten minified, and uses [Binaryen](https://github.com/WebAssembly/binaryen) to convert legacy WebAssembly exception handling to the standard form that wasmtime implements. Running that script on another occt-import-js build produces a replacement.
 

@@ -3,6 +3,7 @@
   Builds the Explorer extension and registers it for the current user from a dev staging
   folder (%LOCALAPPDATA%\BabylonViewerDev), mirroring the installed layout:
     shell\babylon_shell.dll
+    shell\occt.wasm         (OpenCascade, for STEP/IGES/BREP thumbnails)
     viewer\index.html ...
 .PARAMETER Unregister
   Removes the registration.
@@ -30,6 +31,8 @@ if ($Unregister) {
 if (-not $NoBuild) {
     npm run build --prefix (Join-Path $root 'viewer')
     if ($LASTEXITCODE -ne 0) { throw 'viewer build failed' }
+    node (Join-Path $root 'scripts\build-occt.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'OpenCascade kernel build failed' }
     cargo build --release -p babylon-shell --manifest-path (Join-Path $root 'Cargo.toml')
     if ($LASTEXITCODE -ne 0) { throw 'shell build failed' }
 }
@@ -45,6 +48,7 @@ if (Test-Path $dll) {
 }
 Get-ChildItem (Join-Path $stage 'shell') -Filter '*.old' | Remove-Item -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $root 'target\release\babylon_shell.dll') $dll
+Copy-Item (Join-Path $root 'target\occt\occt.wasm') (Join-Path $stage 'shell\occt.wasm') -Force
 
 $viewer = Join-Path $stage 'viewer'
 if (Test-Path $viewer) { Remove-Item -Recurse -Force $viewer }

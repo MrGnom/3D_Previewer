@@ -3,6 +3,7 @@
 //! Every reader converts into Babylon.js' left-handed, Y-up display space so a thumbnail
 //! matches the default view of the same file in the viewer.
 
+pub mod cad;
 mod gltf;
 mod obj;
 mod ply;
@@ -48,6 +49,9 @@ pub enum Format {
     Glb,
     Ply,
     Splat,
+    Step,
+    Iges,
+    Brep,
 }
 
 impl Format {
@@ -59,6 +63,9 @@ impl Format {
             "glb" => Some(Self::Glb),
             "ply" => Some(Self::Ply),
             "splat" => Some(Self::Splat),
+            "step" | "stp" => Some(Self::Step),
+            "iges" | "igs" => Some(Self::Iges),
+            "brep" => Some(Self::Brep),
             _ => None,
         }
     }
@@ -70,6 +77,9 @@ impl Format {
         }
         if bytes.starts_with(b"ply") {
             return Some(Self::Ply);
+        }
+        if let Some(cad) = sniff_cad(bytes) {
+            return Some(cad);
         }
         if stl::looks_binary(bytes) {
             return Some(Self::Stl);
@@ -100,11 +110,38 @@ pub fn load(bytes: &[u8], format: Format, resources: ResourceLoader) -> Result<M
         Format::Gltf | Format::Glb => gltf::parse(bytes, resources)?,
         Format::Ply => ply::parse(bytes)?,
         Format::Splat => splat::parse(bytes)?,
+        Format::Step => cad::parse(bytes, cad::CadFormat::Step)?,
+        Format::Iges => cad::parse(bytes, cad::CadFormat::Iges)?,
+        Format::Brep => cad::parse(bytes, cad::CadFormat::Brep)?,
     };
     if model.is_empty() {
         return Err("no geometry".into());
     }
     Ok(model)
+}
+
+fn sniff_cad(bytes: &[u8]) -> Option<Format> {
+    let head = &bytes[..bytes.len().min(256)];
+    let text = String::from_utf8_lossy(head);
+    let text = text.trim_start_matches('\u{feff}').trim_start();
+    if text.starts_with("ISO-10303-21") {
+        return Some(Format::Step);
+    }
+    if text.starts_with("DBRep_DrawableShape") || text.starts_with("CASCADE Topology") {
+        return Some(Format::Brep);
+    }
+    // IGES: fixed 80-column records; the first is a Start ('S') or Flag ('F') section line.
+    let first_line = head.split(|&b| b == b'\n').next().unwrap_or_default();
+    let first_line = first_line.strip_suffix(b"\r").unwrap_or(first_line);
+    if first_line.len() == 80
+        && matches!(first_line[72], b'S' | b'F')
+        && first_line[73..]
+            .iter()
+            .all(|b| b.is_ascii_digit() || *b == b' ')
+    {
+        return Some(Format::Iges);
+    }
+    None
 }
 
 pub(crate) fn srgb_to_linear(c: f32) -> f32 {
@@ -204,6 +241,51 @@ mod tests {
         assert!(load(b"not a model", Format::Stl, &no_resources).is_err());
         assert_eq!(Format::sniff(b"\x00\x01\x02"), None);
     }
+
+    #[test]
+    fn sniffs_cad_formats() {
+        let step = b"ISO-10303-21;\nHEADER;\n";
+        assert_eq!(Format::sniff(step), Some(Format::Step));
+        let brep = b"DBRep_DrawableShape\n\nCASCADE Topology V1, (c) Matra-Datavision\n";
+        assert_eq!(Format::sniff(brep), Some(Format::Brep));
+        let iges = format!("{:<72}S{:>7}\n", "IGES file", 1);
+        assert_eq!(Format::sniff(iges.as_bytes()), Some(Format::Iges));
+        assert_eq!(Format::from_extension("STP"), Some(Format::Step));
+        assert_eq!(Format::from_extension("igs"), Some(Format::Iges));
+    }
+
+    /// Needs the prepared kernel: `node scripts/build-occt.mjs` writes target/occt/occt.wasm.
+    #[test]
+    fn step_cube() {
+        if crate::occt_wasm_path().is_none_or(|p| !p.is_file()) {
+            eprintln!("skipping: OpenCascade kernel not built");
+            return;
+        }
+        let m = load(STEP_CUBE.as_bytes(), Format::Step, &no_resources).unwrap();
+        let mesh = &m.meshes[0];
+        assert_eq!(mesh.indices.len(), 12 * 3);
+        // A 1 m cube (FreeCAD export) from the origin, read in millimetres.
+        for axis in 0..3 {
+            let v = mesh.positions.iter().map(|p| p[axis]);
+            let range = (
+                v.clone().fold(f32::MAX, f32::min),
+                v.fold(f32::MIN, f32::max),
+            );
+            assert_eq!(range, (0.0, 1000.0), "axis {axis}");
+        }
+        let img = crate::render_bytes(STEP_CUBE.as_bytes(), None, 64).unwrap();
+        assert!(img.bgra.chunks(4).any(|p| p[3] == 255));
+    }
+
+    #[test]
+    fn step_garbage_is_rejected() {
+        if crate::occt_wasm_path().is_none_or(|p| !p.is_file()) {
+            return;
+        }
+        assert!(load(b"ISO-10303-21;\nnonsense", Format::Step, &no_resources).is_err());
+    }
+
+    const STEP_CUBE: &str = include_str!("../../tests/cube.step");
 
     #[test]
     fn renders_a_triangle() {

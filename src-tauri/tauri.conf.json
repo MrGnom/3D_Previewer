@@ -34,6 +34,7 @@
     "longDescription": "Views STL, OBJ, glTF, FBX, PLY, Gaussian splat, Babylon and STEP/IGES CAD files, with Explorer previews and thumbnails.",
     "resources": {
       "../target/release/babylon_shell.dll": "shell/babylon_shell.dll",
+      "../target/occt/occt.wasm": "shell/occt.wasm",
       "../viewer/dist/": "viewer/",
       "../viewer/node_modules/occt-import-js/dist/license.occt-import-js.txt": "licenses/occt-import-js.txt",
       "../viewer/node_modules/occt-import-js/dist/license.occt.txt": "licenses/opencascade.txt"
