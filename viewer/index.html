@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="light dark" />
+        <title>Babylon Viewer</title>
+        <link rel="stylesheet" href="./src/style.css" />
+    </head>
+    <body>
+        <div id="app">
+            <header id="toolbar">
+                <button id="btn-open" class="btn btn-primary" title="Open a model (Ctrl+O)">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5.5a2 2 0 0 1 2-2h3.1l1.8 1.8h6.1a2 2 0 0 1 2 2V7H6.3a2 2 0 0 0-1.9 1.4L2.5 14V5.5Zm1.4 11 2-6.6a1 1 0 0 1 1-.7H18a.8.8 0 0 1 .8 1l-1.8 5.6a1 1 0 0 1-1 .7Z"/></svg>
+                    <span>Open</span>
+                </button>
+                <div id="file-name" class="file-name"></div>
+                <div class="spacer"></div>
+                <label id="anim-wrap" class="anim" hidden>
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4.2v11.6a.7.7 0 0 0 1 .6l9.3-5.8a.7.7 0 0 0 0-1.2L7 3.6a.7.7 0 0 0-1 .6Z"/></svg>
+                    <select id="anim-select" title="Animation"></select>
+                </label>
+                <button id="btn-frame" class="btn btn-icon" title="Reset view (F)">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7M13 3h2.5A1.5 1.5 0 0 1 17 4.5V7M17 13v2.5a1.5 1.5 0 0 1-1.5 1.5H13M7 17H4.5A1.5 1.5 0 0 1 3 15.5V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="2.6"/></svg>
+                </button>
+                <button id="btn-grid" class="btn btn-icon" aria-pressed="true" title="Grid (G)">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 13.5 7 6h11l-5 7.5Zm3.3-2.5h10.4M4.7 9.5h11M9.8 6 6.5 13.5M14.2 6 11 13.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                </button>
+                <button id="btn-wire" class="btn btn-icon" aria-pressed="false" title="Wireframe (W)">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 16.5 6v8L10 17.5 3.5 14V6Zm0 0v15M3.5 6 10 10l6.5-4M3.5 14 10 10l6.5 4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                </button>
+                <button id="btn-info" class="btn btn-icon" aria-pressed="false" title="Model info (I)">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="6.4" r="1"/></svg>
+                </button>
+            </header>
+            <main id="stage">
+                <canvas id="canvas" touch-action="none"></canvas>
+
+                <section id="empty" class="empty" hidden>
+                    <svg class="empty-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 55 19v26L32 58 9 45V19Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M9 19l23 13 23-13M32 32v26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
+                    <h1>Open a 3D model</h1>
+                    <p>Drop a file here, or</p>
+                    <button id="btn-open-empty" class="btn btn-primary">Browse files…</button>
+                    <p class="formats" id="formats"></p>
+                </section>
+
+                <aside id="info-panel" class="panel" hidden>
+                    <h2>Model</h2>
+                    <dl id="info-list"></dl>
+                </aside>
+
+                <div id="badge" class="badge" hidden></div>
+
+                <div id="loading" class="loading" hidden>
+                    <div class="spinner"></div>
+                    <div id="loading-text">Loading…</div>
+                </div>
+
+                <div id="error" class="error" hidden>
+                    <strong>Couldn’t open this file</strong>
+                    <span id="error-text"></span>
+                </div>
+
+                <div id="drop-overlay" class="drop-overlay" hidden><span>Drop to open</span></div>
+            </main>
+            <input type="file" id="file-input" multiple hidden />
+        </div>
+        <script type="module" src="./src/main.ts"></script>
+    </body>
+</html>

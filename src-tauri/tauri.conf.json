@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Babylon Viewer",
+  "mainBinaryName": "babylon-viewer",
+  "version": "0.1.0",
+  "identifier": "dev.babylonviewer.desktop",
+  "build": {
+    "frontendDist": "../viewer/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev --prefix viewer",
+    "beforeBuildCommand": "npm run build:deps"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Babylon Viewer",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 480,
+        "minHeight": 360,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "shortDescription": "3D model viewer",
+    "longDescription": "Views STL, OBJ, glTF, FBX, PLY, Gaussian splat and Babylon files, with Explorer previews and thumbnails.",
+    "resources": {
+      "../target/release/babylon_shell.dll": "shell/babylon_shell.dll",
+      "../viewer/dist/": "viewer/"
+    },
+    "fileAssociations": [
+      { "ext": ["stl"], "name": "STL model", "description": "STL 3D model", "role": "Viewer", "mimeType": "model/stl" },
+      { "ext": ["obj"], "name": "OBJ model", "description": "Wavefront OBJ 3D model", "role": "Viewer", "mimeType": "model/obj" },
+      { "ext": ["glb"], "name": "glTF binary model", "description": "glTF binary 3D model", "role": "Viewer", "mimeType": "model/gltf-binary" },
+      { "ext": ["gltf"], "name": "glTF model", "description": "glTF 3D model", "role": "Viewer", "mimeType": "model/gltf+json" },
+      { "ext": ["fbx"], "name": "FBX model", "description": "Autodesk FBX 3D model", "role": "Viewer" },
+      { "ext": ["ply"], "name": "PLY model", "description": "PLY 3D model or point cloud", "role": "Viewer" },
+      { "ext": ["splat", "spz"], "name": "Gaussian splat", "description": "Gaussian splat scene", "role": "Viewer" },
+      { "ext": ["babylon"], "name": "Babylon scene", "description": "Babylon.js scene", "role": "Viewer" }
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "./installer-hooks.nsh"
+      }
+    }
+  }
+}

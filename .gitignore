@@ -1,0 +1,5 @@
+node_modules/
+target/
+viewer/dist/
+src-tauri/gen/
+.claude/settings.local.json

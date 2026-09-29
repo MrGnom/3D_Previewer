@@ -1,0 +1,40 @@
+[package]
+name = "babylon-shell"
+version = "0.1.0"
+description = "Explorer preview handler and thumbnail provider for 3D models"
+edition = "2021"
+rust-version = "1.90"
+
+[lib]
+name = "babylon_shell"
+# cdylib: the COM server DLL. rlib: lets examples/tests use the parsers and rasterizer.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+base64 = "0.22"
+gltf = { version = "1.4", default-features = false, features = ["utils"] }
+percent-encoding = "2"
+webview2-com = "0.39"
+windows-core = "0.62"
+
+[dependencies.windows]
+version = "0.62"
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Ole",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_System_SystemServices",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_UI_WindowsAndMessaging",
+]
+
+[dev-dependencies]
+windows = { version = "0.62", features = ["Win32_UI_HiDpi"] }

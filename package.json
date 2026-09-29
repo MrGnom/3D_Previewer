@@ -1,0 +1,18 @@
+{
+  "name": "babylon-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "postinstall": "npm install --prefix viewer",
+    "samples": "node scripts/make-samples.mjs",
+    "build:viewer": "npm run build --prefix viewer",
+    "build:shell": "cargo build --release -p babylon-shell",
+    "build:deps": "npm run build:viewer && npm run build:shell",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.0"
+  }
+}

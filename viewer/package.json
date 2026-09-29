@@ -1,0 +1,21 @@
+{
+  "name": "babylon-desktop-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@babylonjs/core": "9.28.0",
+    "@babylonjs/loaders": "9.28.0",
+    "@babylonjs/materials": "9.28.0",
+    "@tauri-apps/api": "^2.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}
