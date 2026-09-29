@@ -31,10 +31,12 @@
     "targets": ["nsis"],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
     "shortDescription": "3D model viewer",
-    "longDescription": "Views STL, OBJ, glTF, FBX, PLY, Gaussian splat and Babylon files, with Explorer previews and thumbnails.",
+    "longDescription": "Views STL, OBJ, glTF, FBX, PLY, Gaussian splat, Babylon and STEP/IGES CAD files, with Explorer previews and thumbnails.",
     "resources": {
       "../target/release/babylon_shell.dll": "shell/babylon_shell.dll",
-      "../viewer/dist/": "viewer/"
+      "../viewer/dist/": "viewer/",
+      "../viewer/node_modules/occt-import-js/dist/license.occt-import-js.txt": "licenses/occt-import-js.txt",
+      "../viewer/node_modules/occt-import-js/dist/license.occt.txt": "licenses/opencascade.txt"
     },
     "fileAssociations": [
       { "ext": ["stl"], "name": "STL model", "description": "STL 3D model", "role": "Viewer", "mimeType": "model/stl" },
@@ -44,7 +46,10 @@
       { "ext": ["fbx"], "name": "FBX model", "description": "Autodesk FBX 3D model", "role": "Viewer" },
       { "ext": ["ply"], "name": "PLY model", "description": "PLY 3D model or point cloud", "role": "Viewer" },
       { "ext": ["splat", "spz"], "name": "Gaussian splat", "description": "Gaussian splat scene", "role": "Viewer" },
-      { "ext": ["babylon"], "name": "Babylon scene", "description": "Babylon.js scene", "role": "Viewer" }
+      { "ext": ["babylon"], "name": "Babylon scene", "description": "Babylon.js scene", "role": "Viewer" },
+      { "ext": ["step", "stp"], "name": "STEP model", "description": "STEP CAD model", "role": "Viewer", "mimeType": "model/step" },
+      { "ext": ["iges", "igs"], "name": "IGES model", "description": "IGES CAD model", "role": "Viewer", "mimeType": "model/iges" },
+      { "ext": ["brep"], "name": "BREP model", "description": "OpenCascade BREP model", "role": "Viewer" }
     ],
     "windows": {
       "nsis": {

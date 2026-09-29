@@ -15,7 +15,7 @@ use tauri_plugin_dialog::DialogExt;
 /// Extensions the viewer can load (keep in sync with viewer/src/viewer.ts).
 const EXTENSIONS: &[&str] = &[
     "stl", "obj", "glb", "gltf", "fbx", "ply", "splat", "spz", "sog", "babylon", "usdz", "usd",
-    "usda", "usdc", "bvh",
+    "usda", "usdc", "bvh", "step", "stp", "iges", "igs", "brep",
 ];
 
 /// Models (and their side files: .bin, textures, .mtl) are served to the webview through

@@ -17,7 +17,8 @@ use crate::{dll_path, CLSID_PREVIEW_HANDLER, CLSID_THUMBNAIL_PROVIDER};
 
 /// Every format the Babylon.js viewer can show gets the interactive preview.
 pub const PREVIEW_EXTENSIONS: &[&str] = &[
-    "stl", "obj", "glb", "gltf", "fbx", "ply", "splat", "spz", "babylon",
+    "stl", "obj", "glb", "gltf", "fbx", "ply", "splat", "spz", "babylon", "step", "stp", "iges",
+    "igs", "brep",
 ];
 /// Formats the CPU thumbnail renderer understands.
 pub const THUMBNAIL_EXTENSIONS: &[&str] = &["stl", "obj", "glb", "gltf", "ply", "splat"];

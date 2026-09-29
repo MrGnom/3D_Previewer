@@ -1,4 +1,5 @@
 import { createHost, type Host } from "./host";
+import { setCadQuality } from "./stepLoader";
 import { extensionOf, ModelViewer, SUPPORTED_EXTENSIONS, type ModelSource, type ModelStats } from "./viewer";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -103,6 +104,8 @@ function toggle(button: HTMLElement, on: boolean): void {
 async function main(): Promise<void> {
     const host: Host = await createHost();
     app.dataset.mode = host.mode;
+    // Coarser CAD tessellation in the preview pane: it converts faster.
+    setCadQuality(host.mode === "preview" ? "fast" : "fine");
 
     const viewer = new ModelViewer(canvas);
     const applyBackground = () => {

@@ -19,6 +19,7 @@ import {
 } from "@babylonjs/core";
 import { registerBuiltInLoaders } from "@babylonjs/loaders/dynamic";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
+import { CAD_EXTENSIONS } from "./stepLoader";
 import { createStudioEnvironmentUrl } from "./studioEnvironment";
 
 registerBuiltInLoaders();
@@ -52,7 +53,7 @@ export interface ModelStats {
 
 export const SUPPORTED_EXTENSIONS = [
     ".stl", ".obj", ".glb", ".gltf", ".fbx", ".ply", ".splat", ".spz", ".sog",
-    ".babylon", ".usdz", ".usd", ".usda", ".usdc", ".bvh",
+    ".babylon", ".usdz", ".usd", ".usda", ".usdc", ".bvh", ...CAD_EXTENSIONS,
 ];
 
 export function extensionOf(name: string): string {
