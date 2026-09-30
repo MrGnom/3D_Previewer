@@ -17,10 +17,13 @@ use crate::{dll_path, CLSID_PREVIEW_HANDLER, CLSID_THUMBNAIL_PROVIDER};
 
 /// Every format the Babylon.js viewer can show gets the interactive preview.
 pub const PREVIEW_EXTENSIONS: &[&str] = &[
-    "stl", "obj", "glb", "gltf", "fbx", "ply", "splat", "spz", "babylon",
+    "stl", "obj", "glb", "gltf", "fbx", "ply", "splat", "spz", "babylon", "step", "stp", "iges",
+    "igs", "brep",
 ];
-/// Formats the CPU thumbnail renderer understands.
-pub const THUMBNAIL_EXTENSIONS: &[&str] = &["stl", "obj", "glb", "gltf", "ply", "splat"];
+/// Formats the CPU thumbnail renderer understands (CAD formats via OpenCascade in wasmtime).
+pub const THUMBNAIL_EXTENSIONS: &[&str] = &[
+    "stl", "obj", "glb", "gltf", "ply", "splat", "step", "stp", "iges", "igs", "brep",
+];
 
 const PREVIEW_SHELLEX: &str = "{8895b1c6-b41f-4c1c-a562-0d564250836f}";
 const THUMBNAIL_SHELLEX: &str = "{e357fccd-a995-4576-b01f-234630154e96}";
@@ -157,6 +160,12 @@ pub fn register() -> windows::core::Result<()> {
     }
 
     unsafe { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None) };
+
+    // Compile the CAD kernel now (a few seconds, once) rather than on the first STEP thumbnail.
+    // A failure only means CAD thumbnails fall back to the default icon.
+    if let Err(e) = crate::model::cad::warm_up() {
+        crate::log(&format!("OpenCascade warm-up failed: {e}"));
+    }
     Ok(())
 }
 
@@ -186,6 +195,9 @@ pub fn unregister() -> windows::core::Result<()> {
     }
     delete_tree(&format!(r"Software\Classes\CLSID\{preview}"));
     delete_tree(&format!(r"Software\Classes\CLSID\{thumbnail}"));
+    if let Some(cache) = crate::cache_dir() {
+        let _ = std::fs::remove_dir_all(cache);
+    }
 
     unsafe { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None) };
     Ok(())

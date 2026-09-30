@@ -3,7 +3,7 @@ name = "babylon-shell"
 version = "0.1.0"
 description = "Explorer preview handler and thumbnail provider for 3D models"
 edition = "2021"
-rust-version = "1.90"
+rust-version = "1.94"
 
 [lib]
 name = "babylon_shell"
@@ -14,10 +14,15 @@ crate-type = ["cdylib", "rlib"]
 base64 = "0.22"
 gltf = { version = "1.4", default-features = false, features = ["utils"] }
 percent-encoding = "2"
+# Runs OpenCascade (WebAssembly) for STEP/IGES/BREP thumbnails.
+wasmtime = { version = "47.0.4", default-features = false, features = ["cranelift", "runtime", "std", "parallel-compilation", "gc", "gc-drc"] }
+
+# The COM server is Windows-only; the model readers and rasterizer also build elsewhere (tests).
+[target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
 windows-core = "0.62"
 
-[dependencies.windows]
+[target.'cfg(windows)'.dependencies.windows]
 version = "0.62"
 features = [
     "Win32_Foundation",
@@ -36,5 +41,5 @@ features = [
     "Win32_UI_WindowsAndMessaging",
 ]
 
-[dev-dependencies]
+[target.'cfg(windows)'.dev-dependencies]
 windows = { version = "0.62", features = ["Win32_UI_HiDpi"] }

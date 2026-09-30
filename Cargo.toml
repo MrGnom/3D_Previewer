@@ -2,6 +2,19 @@
 members = ["src-tauri", "shell"]
 resolver = "2"
 
+# Cranelift compiles the OpenCascade kernel for CAD thumbnails; unoptimized, that takes minutes
+# in debug and test builds instead of seconds.
+[profile.dev.package.cranelift-codegen]
+opt-level = 3
+[profile.dev.package.regalloc2]
+opt-level = 3
+[profile.dev.package.cranelift-frontend]
+opt-level = 3
+[profile.dev.package.wasmtime-internal-cranelift]
+opt-level = 3
+[profile.dev.package.wasmparser]
+opt-level = 3
+
 [profile.release]
 lto = true
 codegen-units = 1

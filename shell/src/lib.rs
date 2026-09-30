@@ -3,7 +3,8 @@
 //! * Preview handler (Preview pane, Alt+P): hosts WebView2 running the same Babylon.js
 //!   viewer bundle as the desktop app, so every format the app opens is previewable.
 //! * Thumbnail provider: renders geometry on the CPU (see [`render`]) for fast, GPU-free
-//!   thumbnails of STL / OBJ / glTF / PLY / splat files.
+//!   thumbnails of STL / OBJ / glTF / PLY / splat files, and of STEP / IGES / BREP files via
+//!   OpenCascade compiled to WebAssembly (see [`model::cad`]).
 
 // The MSVC linker notes that Dll* exports "should be PRIVATE"; harmless for a COM server.
 #![allow(linker_messages)]
@@ -32,6 +33,58 @@ pub fn data_dir() -> Option<std::path::PathBuf> {
 
 #[cfg(not(windows))]
 pub fn data_dir() -> Option<std::path::PathBuf> {
+    None
+}
+
+/// Per-user cache (compiled OpenCascade kernel): `%LOCALAPPDATA%\BabylonViewer\cache`.
+/// Deliberately not under LocalLow: the cache holds native code, so lower-integrity processes
+/// must not be able to write it.
+#[cfg(windows)]
+pub fn cache_dir() -> Option<std::path::PathBuf> {
+    use windows::Win32::{
+        System::Com::CoTaskMemFree,
+        UI::Shell::{FOLDERID_LocalAppData, SHGetKnownFolderPath, KF_FLAG_DEFAULT},
+    };
+    let base = unsafe {
+        let p = SHGetKnownFolderPath(&FOLDERID_LocalAppData, KF_FLAG_DEFAULT, None).ok()?;
+        let s = p.to_string().ok();
+        CoTaskMemFree(Some(p.0 as *const _));
+        s
+    }?;
+    Some(
+        std::path::PathBuf::from(base)
+            .join("BabylonViewer")
+            .join("cache"),
+    )
+}
+
+/// Outside Windows (development and tests), caching is opt-in via `BABYLON_SHELL_CACHE`.
+#[cfg(not(windows))]
+pub fn cache_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("BABYLON_SHELL_CACHE").map(std::path::PathBuf::from)
+}
+
+/// OpenCascade kernel for CAD thumbnails: `occt.wasm` next to this DLL (prepared by
+/// scripts/build-occt.mjs). `BABYLON_OCCT_WASM` overrides it; tests use the build output.
+pub fn occt_wasm_path() -> Option<std::path::PathBuf> {
+    if let Some(p) = std::env::var_os("BABYLON_OCCT_WASM") {
+        return Some(p.into());
+    }
+    #[cfg(test)]
+    {
+        let built =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/occt/occt.wasm");
+        if built.is_file() {
+            return Some(built);
+        }
+    }
+    #[cfg(windows)]
+    {
+        let beside_dll = dll_path().with_file_name("occt.wasm");
+        if beside_dll.is_file() {
+            return Some(beside_dll);
+        }
+    }
     None
 }
 
@@ -65,7 +118,9 @@ pub fn render_bytes(
     size: u32,
 ) -> Option<render::Image> {
     let format = format.or_else(|| model::Format::sniff(bytes))?;
-    let model = model::load(bytes, format, &|_| None).ok()?;
+    let model = model::load(bytes, format, &|_| None)
+        .map_err(|e| log(&format!("cannot read {format:?} model: {e}")))
+        .ok()?;
     render::render(&model, size)
 }
 
