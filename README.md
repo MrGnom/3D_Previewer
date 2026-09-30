@@ -43,6 +43,10 @@ This builds the viewer bundle and `babylon_shell.dll`, then the app, then the in
 
 Uninstalling reverses all three.
 
+### Releases
+
+The *Release* workflow (`.github/workflows/release.yml`) builds the installer on a Windows runner and attaches it to a draft GitHub release named after the version in `src-tauri/tauri.conf.json`. Start it from the Actions tab (*Release* → *Run workflow*) or by pushing a matching tag such as `v0.1.0`, then review and publish the draft on the Releases page. Bump the version in `src-tauri/tauri.conf.json` (and the `package.json`/`Cargo.toml` files) before each new release.
+
 ## Development
 
 ```bash
