@@ -1,0 +1,91 @@
+# Builds the Windows installer and attaches it to a draft GitHub release.
+#
+# Run it from the Actions tab ("Release" > "Run workflow"), or push a tag like v0.1.0.
+# The release is created as a draft named after the version in src-tauri/tauri.conf.json;
+# review it on the Releases page, then publish it.
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            viewer/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read version
+        id: version
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "${{ steps.version.outputs.tag }}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match version ${{ steps.version.outputs.version }} in src-tauri/tauri.conf.json"
+            exit 1
+          fi
+
+      # Builds the viewer, the OpenCascade kernel, babylon_shell.dll, the app and the NSIS installer.
+      - name: Build installer
+        run: npm run build
+
+      - name: Locate installer
+        id: installer
+        run: |
+          installer=$(ls target/release/bundle/nsis/*-setup.exe | head -n 1)
+          test -f "$installer"
+          echo "path=$installer" >> "$GITHUB_OUTPUT"
+          ls -la target/release/bundle/nsis/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: ${{ steps.installer.outputs.path }}
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          INSTALLER: ${{ steps.installer.outputs.path }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$INSTALLER" --clobber
+          else
+            gh release create "$TAG" "$INSTALLER" \
+              --draft \
+              --target "$GITHUB_SHA" \
+              --title "Babylon Viewer $TAG" \
+              --generate-notes
+          fi
