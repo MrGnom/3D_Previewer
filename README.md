@@ -2,8 +2,8 @@
 
 A replacement for the retired Windows 3D Viewer, built on [Babylon.js](https://www.babylonjs.com/):
 
-- **Desktop app** (Tauri 2): opens STL, OBJ, glTF/GLB, FBX, PLY, Gaussian splats (`.splat`, `.spz`, `.sog`), USD/USDZ, BVH and `.babylon` files, plus STEP (`.step`, `.stp`), IGES (`.iges`, `.igs`) and OpenCascade BREP CAD models. It supports double-click file associations, drag and drop, an Open dialog, a grid, wireframe mode, model info (size W×D×H, vertices, triangles) and animation playback.
-- **Explorer Preview pane** (Alt+P): an interactive preview of the same formats. It's a native COM preview handler that hosts WebView2 and runs the same viewer bundle.
+- **Desktop app** (Tauri 2): opens STL, OBJ, glTF/GLB, FBX, PLY, Gaussian splats (`.splat`, `.spz`, `.sog`), USD/USDZ, BVH and `.babylon` files, plus STEP (`.step`, `.stp`), IGES (`.iges`, `.igs`) and OpenCascade BREP CAD models. It supports double-click file associations, drag and drop, an Open dialog, a grid, wireframe mode, model info (size W×D×H, vertices, triangles) and animation playback, and follows the Windows light/dark app theme.
+- **Explorer Preview pane** (Alt+P): an interactive preview of the same formats, in the Windows light/dark theme and without the grid (G shows it). It's a native COM preview handler that hosts WebView2 and runs the same viewer bundle.
 - **Explorer thumbnails**: STL, OBJ, glTF/GLB, PLY and `.splat` thumbnails, drawn by a small CPU rasterizer (no GPU or browser needed, ~10–50 ms per file). STEP, IGES and BREP thumbnails are tessellated by OpenCascade running in [wasmtime](https://wasmtime.dev/) inside the DLL (~0.1–0.5 s per file).
 
 ```

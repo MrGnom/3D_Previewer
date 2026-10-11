@@ -17,6 +17,15 @@ export interface Host {
     setTitle(title: string): void;
     /** Background color requested by the host (e.g. Explorer theme), as #rrggbb. */
     background?: string;
+    /** Calls `apply` with the system theme now and again whenever it changes. */
+    watchTheme(apply: (dark: boolean) => void): void;
+}
+
+/** Follows `prefers-color-scheme`, which WebView2 derives from the Windows app theme. */
+function watchMediaTheme(apply: (dark: boolean) => void, initial?: boolean): void {
+    const query = matchMedia("(prefers-color-scheme: dark)");
+    apply(initial ?? query.matches);
+    query.addEventListener("change", (e) => apply(e.matches));
 }
 
 interface NativeModelRef {
@@ -55,12 +64,29 @@ async function createAppHost(): Promise<Host> {
         setTitle(title) {
             void getCurrentWindow().setTitle(title);
         },
+        watchTheme(apply) {
+            // The window's theme follows Windows' app theme, including later changes.
+            const win = getCurrentWindow();
+            win.theme().then(
+                (theme) => {
+                    if (theme === null) {
+                        watchMediaTheme(apply);
+                        return;
+                    }
+                    apply(theme === "dark");
+                    void win.onThemeChanged(({ payload }) => apply(payload === "dark"));
+                },
+                () => watchMediaTheme(apply),
+            );
+        },
     };
 }
 
 function createPreviewHost(params: URLSearchParams): Host {
     const file = params.get("file");
     const bg = params.get("bg");
+    // Windows' app theme as read by the preview handler; later changes come through the media query.
+    const theme = params.get("theme");
     return {
         mode: "preview",
         background: bg && /^[0-9a-f]{6}$/i.test(bg) ? `#${bg}` : undefined,
@@ -74,6 +100,9 @@ function createPreviewHost(params: URLSearchParams): Host {
                   }
                 : null,
         setTitle() {},
+        watchTheme(apply) {
+            watchMediaTheme(apply, theme === "dark" ? true : theme === "light" ? false : undefined);
+        },
     };
 }
 
@@ -95,6 +124,9 @@ function createBrowserHost(params: URLSearchParams): Host {
         },
         setTitle(title) {
             document.title = title;
+        },
+        watchTheme(apply) {
+            watchMediaTheme(apply);
         },
     };
 }
