@@ -97,6 +97,11 @@ function showError(message: string): void {
     errorBox.hidden = false;
 }
 
+function isDarkColor(hex: string): boolean {
+    const n = parseInt(hex.slice(1), 16);
+    return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255) < 128;
+}
+
 function toggle(button: HTMLElement, on: boolean): void {
     button.setAttribute("aria-pressed", String(on));
 }
@@ -108,19 +113,13 @@ async function main(): Promise<void> {
     setCadQuality(host.mode === "preview" ? "fast" : "fine");
 
     const viewer = new ModelViewer(canvas);
-    const applyBackground = () => {
-        const bg = host.background ?? getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
-        viewer.setBackground(bg);
-    };
-    if (host.background) {
-        // Match Explorer's preview pane color and pick the UI theme from its luminance.
-        const n = parseInt(host.background.slice(1), 16);
-        const lum = (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
-        document.documentElement.dataset.theme = lum > 0.5 ? "light" : "dark";
-        document.body.style.background = host.background;
-    }
-    applyBackground();
-    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyBackground);
+    host.watchTheme((dark) => {
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        // Use Explorer's pane color when it fits the theme; in dark mode it can still report a light one.
+        const hostBg = host.background && isDarkColor(host.background) === dark ? host.background : undefined;
+        document.body.style.background = hostBg ?? "";
+        viewer.setBackground(hostBg ?? getComputedStyle(document.documentElement).getPropertyValue("--bg").trim());
+    });
 
     $("formats").textContent = "Supported: " + SUPPORTED_EXTENSIONS.map((e) => e.slice(1).toUpperCase()).join(", ");
     fileInput.accept = SUPPORTED_EXTENSIONS.join(",") + ",.bin,.png,.jpg,.jpeg,.webp,.ktx2,.mtl";
@@ -217,6 +216,8 @@ async function main(): Promise<void> {
         infoPanel.hidden = !on;
         toggle(btnInfo, on);
     };
+    // The preview pane starts without the grid (G turns it on); the app shows it.
+    setGrid(host.mode !== "preview");
 
     $("btn-open").addEventListener("click", () => void pick());
     $("btn-open-empty").addEventListener("click", () => void pick());

@@ -33,6 +33,7 @@ use windows::{
         System::{
             Com::{CoInitializeEx, CoUninitialize, IStream, COINIT_APARTMENTTHREADED},
             Ole::{IObjectWithSite, IObjectWithSite_Impl, IOleWindow, IOleWindow_Impl},
+            Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD},
             Threading::GetCurrentThreadId,
         },
         UI::{
@@ -375,6 +376,44 @@ fn user_data_dir() -> PathBuf {
         .join("PreviewWebView2")
 }
 
+/// Windows' app theme (Settings > Personalization > Colors), or `None` if it can't be read.
+fn system_dark_theme() -> Option<bool> {
+    let mut value = 0u32;
+    let mut size = std::mem::size_of::<u32>() as u32;
+    unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"),
+            w!("AppsUseLightTheme"),
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut value as *mut u32 as *mut c_void),
+            Some(&mut size),
+        )
+        .ok()
+        .ok()?;
+    }
+    Some(value == 0)
+}
+
+fn is_dark(c: COLORREF) -> bool {
+    let v = c.0;
+    let (r, g, b) = (v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff);
+    0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * (b as f32) < 128.0
+}
+
+/// The pane background: Explorer's color when it fits the app theme (Explorer can report a
+/// light color in dark mode), otherwise the viewer's own background for that theme.
+fn theme_background(explorer: Option<COLORREF>, dark: Option<bool>) -> Option<COLORREF> {
+    match (explorer, dark) {
+        (Some(bg), Some(dark)) if is_dark(bg) != dark => {
+            // Matches --bg in viewer/src/style.css (COLORREF is 0x00BBGGRR).
+            Some(COLORREF(if dark { 0x001f1f1f } else { 0x00f3f3f3 }))
+        }
+        (bg, _) => bg,
+    }
+}
+
 fn colorref_hex(c: COLORREF) -> String {
     let v = c.0;
     format!(
@@ -525,6 +564,8 @@ fn start_webview(state: Rc<RefCell<State>>) -> Result<()> {
                         }
                         (s.rect, s.background)
                     };
+                    let dark = system_dark_theme();
+                    let background = theme_background(background, dark);
 
                     unsafe {
                         if let (Some(bg), Ok(c2)) =
@@ -587,6 +628,9 @@ fn start_webview(state: Rc<RefCell<State>>) -> Result<()> {
                         );
                         if let Some(bg) = background {
                             url.push_str(&format!("&bg={}", colorref_hex(bg)));
+                        }
+                        if let Some(dark) = dark {
+                            url.push_str(if dark { "&theme=dark" } else { "&theme=light" });
                         }
                         let mut nav_token = 0i64;
                         webview.add_NavigationCompleted(
