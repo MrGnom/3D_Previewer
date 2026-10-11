@@ -1,6 +1,6 @@
 [package]
 name = "babylon-shell"
-version = "0.1.0"
+version = "0.2.0"
 description = "Explorer preview handler and thumbnail provider for 3D models"
 edition = "2021"
 rust-version = "1.94"
