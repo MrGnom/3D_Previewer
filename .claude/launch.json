@@ -13,6 +13,15 @@
       "port": 5173
     },
     {
+      "name": "viewer-fnm",
+      "runtimeExecutable": "C:\\Users\\Yurii\\AppData\\Roaming\\fnm\\aliases\\default\\node.exe",
+      "runtimeArgs": [
+        "node_modules/vite/bin/vite.js"
+      ],
+      "cwd": "viewer",
+      "port": 5173
+    },
+    {
       "name": "viewer-dist",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
