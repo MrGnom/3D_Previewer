@@ -97,8 +97,10 @@ export class ModelViewer {
         camera.wheelDeltaPercentage = 0.01;
         camera.pinchDeltaPercentage = 0.01;
         camera.useNaturalPinchZoom = true;
-        camera.lowerBetaLimit = null;
-        camera.upperBetaLimit = null;
+        // Allow looking straight down/up, but never past the poles: with allowUpsideDown=false
+        // an unclamped beta crosses the pole while "up" stays +Y, which flips the view.
+        camera.lowerBetaLimit = 1e-3;
+        camera.upperBetaLimit = Math.PI - 1e-3;
         camera.allowUpsideDown = false;
         camera.inertia = 0.85;
         camera.panningInertia = 0.85;
@@ -125,7 +127,9 @@ export class ModelViewer {
         this.gridMaterial = new GridMaterial("gridMaterial", scene);
         this.gridMaterial.majorUnitFrequency = 10;
         this.gridMaterial.minorUnitVisibility = 0.3;
-        this.gridMaterial.opacity = 0.98;
+        // Lines only (cells are discarded) and semi-transparent, so the floor never hides the model.
+        this.gridMaterial.linesOnly = true;
+        this.gridMaterial.opacity = 0.6;
         this.gridMaterial.backFaceCulling = false;
 
         // Keep panning 1:1 with the cursor regardless of model scale / zoom.
