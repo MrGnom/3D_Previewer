@@ -6,6 +6,7 @@
         <meta name="color-scheme" content="light dark" />
         <title>Babylon Viewer</title>
         <link rel="stylesheet" href="./src/style.css" />
+        <link rel="stylesheet" href="./src/batch.css" />
     </head>
     <body>
         <div id="app">
@@ -14,6 +15,19 @@
                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5.5a2 2 0 0 1 2-2h3.1l1.8 1.8h6.1a2 2 0 0 1 2 2V7H6.3a2 2 0 0 0-1.9 1.4L2.5 14V5.5Zm1.4 11 2-6.6a1 1 0 0 1 1-.7H18a.8.8 0 0 1 .8 1l-1.8 5.6a1 1 0 0 1-1 .7Z"/></svg>
                     <span>Open</span>
                 </button>
+                <div class="menu-wrap">
+                    <button id="btn-tools" class="btn" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="Tools">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.6 2.6a4.4 4.4 0 0 0-4 6l-5.4 5.3a1.8 1.8 0 0 0 2.6 2.6l5.3-5.4a4.4 4.4 0 0 0 5.9-5.4l-2.5 2.5-2.1-.5-.5-2.1 2.5-2.5a4.4 4.4 0 0 0-1.8-.5Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                        <span>Tools</span>
+                        <svg class="chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div id="tools-menu" class="menu" role="menu" hidden>
+                        <button id="mi-batch" class="menu-item" role="menuitem">
+                            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.75" y="4.75" width="10.5" height="10.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6 3h9.5A1.5 1.5 0 0 1 17 4.5V14M4.5 13l2.6-3 2 2.2 1.3-1.5 1.9 2.3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span>Generate preview images…</span>
+                        </button>
+                    </div>
+                </div>
                 <div id="file-name" class="file-name"></div>
                 <div class="spacer"></div>
                 <label id="anim-wrap" class="anim" hidden>
@@ -65,6 +79,126 @@
             </main>
             <input type="file" id="file-input" multiple hidden />
         </div>
+
+        <dialog id="batch-dialog" class="dialog" aria-labelledby="batch-title">
+            <header class="dialog-head">
+                <h2 id="batch-title">Generate preview images</h2>
+                <button id="batch-x" class="btn btn-icon" type="button" title="Close" aria-label="Close">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+            </header>
+            <div class="dialog-body">
+                <section class="batch-models" aria-label="Models">
+                    <div class="section-head">
+                        <h3>Models <span id="batch-count" class="count"></span></h3>
+                        <div class="row-actions">
+                            <button id="batch-clear" class="btn btn-subtle" type="button">Clear</button>
+                            <button id="batch-add" class="btn btn-secondary" type="button">
+                                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                                <span>Add models…</span>
+                            </button>
+                        </div>
+                    </div>
+                    <ul id="batch-list" class="batch-list"></ul>
+                    <div id="batch-empty" class="batch-empty">
+                        <p>No models selected.</p>
+                        <p class="hint">Use <strong>Add models…</strong> or drop files here.</p>
+                    </div>
+                </section>
+
+                <section class="batch-settings" aria-label="Output settings">
+                    <h3>Image</h3>
+                    <label class="field">
+                        <span>Resolution</span>
+                        <select id="opt-size">
+                            <option value="256x256">256 × 256</option>
+                            <option value="512x512">512 × 512</option>
+                            <option value="1024x1024">1024 × 1024</option>
+                            <option value="2048x2048">2048 × 2048</option>
+                            <option value="1280x720">1280 × 720 (HD)</option>
+                            <option value="1920x1080">1920 × 1080 (Full HD)</option>
+                            <option value="3840x2160">3840 × 2160 (4K)</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </label>
+                    <div class="field size-inputs">
+                        <span class="sr-only">Width and height in pixels</span>
+                        <input id="opt-width" type="number" min="16" step="1" aria-label="Width in pixels" />
+                        <span class="times">×</span>
+                        <input id="opt-height" type="number" min="16" step="1" aria-label="Height in pixels" />
+                        <span class="unit">px</span>
+                    </div>
+
+                    <div class="field">
+                        <span>Format</span>
+                        <div class="segmented" role="radiogroup" aria-label="Format">
+                            <label><input type="radio" name="opt-format" value="png" checked /><span>PNG</span></label>
+                            <label><input type="radio" name="opt-format" value="jpeg" /><span>JPEG</span></label>
+                        </div>
+                    </div>
+                    <label id="quality-field" class="field">
+                        <span>JPEG quality <output id="opt-quality-value"></output></span>
+                        <input id="opt-quality" type="range" min="50" max="100" step="1" />
+                    </label>
+
+                    <label class="field">
+                        <span>Background</span>
+                        <div class="inline">
+                            <select id="opt-bg">
+                                <option value="theme">Viewer theme</option>
+                                <option value="transparent">Transparent</option>
+                                <option value="custom">Custom color</option>
+                            </select>
+                            <input id="opt-bg-color" type="color" aria-label="Background color" />
+                        </div>
+                    </label>
+                    <p id="bg-note" class="note" hidden>JPEG has no transparency, so a white background is used.</p>
+
+                    <label class="field">
+                        <span>View</span>
+                        <select id="opt-view">
+                            <option value="iso">3/4 view</option>
+                            <option value="front">Front</option>
+                            <option value="back">Back</option>
+                            <option value="left">Left</option>
+                            <option value="right">Right</option>
+                            <option value="top">Top</option>
+                            <option value="bottom">Bottom</option>
+                        </select>
+                    </label>
+                    <label class="check"><input id="opt-grid" type="checkbox" /><span>Show floor grid</span></label>
+
+                    <h3>Output</h3>
+                    <label class="field">
+                        <span>File name</span>
+                        <div class="inline">
+                            <input id="opt-name" type="text" spellcheck="false" />
+                            <span id="opt-ext" class="ext">.png</span>
+                        </div>
+                        <small class="hint">{name} = model name, {ext} = model extension, {w}/{h} = size</small>
+                    </label>
+                    <div id="dest-fields" class="field">
+                        <span>Save to</span>
+                        <label class="radio"><input type="radio" name="opt-dest" value="beside" checked /><span>Next to each model</span></label>
+                        <label class="radio"><input type="radio" name="opt-dest" value="folder" /><span>Folder</span></label>
+                        <div class="inline folder-row">
+                            <input id="opt-folder" type="text" readonly placeholder="No folder chosen" />
+                            <button id="opt-folder-browse" class="btn btn-secondary" type="button">Browse…</button>
+                        </div>
+                    </div>
+                    <p id="download-note" class="note" hidden>Images are saved to your browser’s downloads.</p>
+                    <label class="check"><input id="opt-overwrite" type="checkbox" /><span>Replace existing images</span></label>
+                </section>
+            </div>
+            <footer class="dialog-foot">
+                <div class="progress-wrap">
+                    <progress id="batch-progress" max="1" value="0" hidden></progress>
+                    <span id="batch-status" class="status" role="status"></span>
+                </div>
+                <button id="batch-close" class="btn btn-secondary" type="button">Close</button>
+                <button id="batch-run" class="btn btn-primary" type="button">Generate</button>
+            </footer>
+        </dialog>
         <script type="module" src="./src/main.ts"></script>
     </body>
 </html>

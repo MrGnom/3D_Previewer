@@ -1,0 +1,494 @@
+/* Tools menu and the "Generate preview images" dialog. Uses the tokens from style.css. */
+
+/* ---- Tools menu ---- */
+
+.menu-wrap {
+    position: relative;
+}
+
+.btn .chevron {
+    width: 14px;
+    height: 14px;
+    margin-left: -2px;
+    color: var(--text-2);
+}
+
+.btn[aria-expanded="true"] {
+    background: var(--hover);
+}
+
+.menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 10;
+    min-width: 240px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: var(--shadow);
+}
+
+.menu[hidden] {
+    display: none;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.menu-item svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--text-2);
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+    background: var(--hover);
+    outline: none;
+}
+
+/* ---- Dialog frame ---- */
+
+.dialog {
+    width: min(880px, calc(100vw - 32px));
+    max-height: min(680px, calc(100vh - 32px));
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.dialog::backdrop {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.dialog-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 12px 8px 20px;
+    flex: none;
+}
+
+.dialog-head h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.dialog-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 20px;
+    padding: 4px 20px 16px;
+    min-height: 0;
+    overflow: auto;
+}
+
+.dialog h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.dialog-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    flex: none;
+}
+
+.progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.progress-wrap progress {
+    width: 100%;
+    height: 4px;
+    accent-color: var(--accent);
+}
+
+.progress-wrap progress[hidden] {
+    display: none;
+}
+
+.status {
+    color: var(--text-2);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status.is-error {
+    color: var(--danger);
+}
+
+/* ---- Buttons ---- */
+
+.btn-secondary {
+    border-color: var(--border);
+    background: var(--surface-2);
+}
+
+.btn-subtle {
+    color: var(--text-2);
+}
+
+.btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+}
+
+.dialog-foot .btn {
+    min-width: 96px;
+}
+
+.btn-small {
+    width: 28px;
+    height: 28px;
+}
+
+.btn-small svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---- Models column ---- */
+
+.batch-models {
+    display: flex;
+    flex-direction: column;
+    min-height: 320px;
+    min-width: 0;
+}
+
+.section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.section-head h3 {
+    margin: 0;
+}
+
+.count {
+    color: var(--text-2);
+    font-weight: 400;
+}
+
+.row-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.batch-list {
+    flex: 1;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-2);
+    overflow: auto;
+}
+
+.batch-list:empty {
+    display: none;
+}
+
+.batch-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: 1px dashed color-mix(in srgb, var(--text-2) 40%, transparent);
+    border-radius: 6px;
+    color: var(--text-2);
+    text-align: center;
+}
+
+.batch-empty[hidden] {
+    display: none;
+}
+
+.batch-empty p {
+    margin: 0;
+}
+
+.batch-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 4px 4px 4px 10px;
+    border-radius: 4px;
+}
+
+.batch-item:hover {
+    background: var(--hover);
+}
+
+.item-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.item-name,
+.item-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.item-path {
+    color: var(--text-2);
+    font-size: 12px;
+}
+
+.item-state {
+    flex: none;
+    font-size: 12px;
+    color: var(--text-2);
+}
+
+.state-working .item-state {
+    color: var(--accent);
+}
+
+.state-done .item-state::before {
+    content: "\2713\00a0";
+}
+
+.state-done .item-state {
+    color: color-mix(in srgb, var(--accent) 70%, var(--text));
+}
+
+.state-error .item-state {
+    color: var(--danger);
+    cursor: help;
+}
+
+/* ---- Settings column ---- */
+
+.batch-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.batch-settings h3:not(:first-child) {
+    margin-top: 8px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.field[hidden],
+.check[hidden],
+.note[hidden] {
+    display: none;
+}
+
+.field > span:first-child {
+    color: var(--text-2);
+    font-size: 13px;
+}
+
+.dialog input[type="text"],
+.dialog input[type="number"],
+.dialog select {
+    height: 32px;
+    min-width: 0;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-bottom-color: color-mix(in srgb, var(--text-2) 45%, transparent);
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+}
+
+.dialog input:focus-visible,
+.dialog select:focus-visible {
+    outline: none;
+    border-bottom: 2px solid var(--accent);
+}
+
+.dialog input[readonly] {
+    color: var(--text-2);
+}
+
+.dialog input:disabled {
+    opacity: 0.5;
+}
+
+.size-inputs {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    margin-top: -4px;
+}
+
+.size-inputs input {
+    width: 90px;
+    font-variant-numeric: tabular-nums;
+}
+
+.times,
+.unit,
+.ext {
+    color: var(--text-2);
+}
+
+.inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.inline > input[type="text"],
+.inline > select {
+    flex: 1;
+}
+
+.dialog input[type="color"] {
+    width: 40px;
+    height: 32px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface-2);
+}
+
+.dialog input[type="color"][hidden] {
+    display: none;
+}
+
+.dialog input[type="range"] {
+    accent-color: var(--accent);
+}
+
+.segmented {
+    display: inline-flex;
+    align-self: flex-start;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-2);
+}
+
+.segmented label {
+    position: relative;
+}
+
+.segmented input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.segmented span {
+    display: block;
+    padding: 4px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.segmented input:checked + span {
+    background: var(--accent);
+    color: var(--accent-text);
+}
+
+.segmented input:focus-visible + span {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.check,
+.radio {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.check input,
+.radio input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.folder-row {
+    margin-left: 24px;
+}
+
+.hint,
+.note {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 12px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+}
+
+@media (max-width: 640px) {
+    .dialog-body {
+        grid-template-columns: 1fr;
+    }
+
+    .batch-models {
+        min-height: 220px;
+    }
+}

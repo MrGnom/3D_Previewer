@@ -34,6 +34,8 @@ const SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
 struct AppState {
     /// Folders the webview may read from: only those of models the user opened.
     allowed_dirs: Mutex<HashSet<PathBuf>>,
+    /// Folders the user picked as an output location for generated preview images.
+    output_dirs: Mutex<HashSet<PathBuf>>,
     initial: Mutex<Option<PathBuf>>,
 }
 
@@ -43,6 +45,8 @@ struct ModelRef {
     root_url: String,
     file_name: String,
     display_name: String,
+    /// Absolute path on disk (used to name and place generated preview images).
+    path: String,
 }
 
 fn encode_segment(s: &str) -> String {
@@ -113,6 +117,7 @@ fn model_ref(state: &AppState, path: &Path) -> Result<ModelRef, String> {
         root_url,
         file_name: encode_segment(&name),
         display_name: name,
+        path: path.to_string_lossy().into_owned(),
     })
 }
 
@@ -146,6 +151,101 @@ async fn pick_model(
         }
         None => Ok(None),
     }
+}
+
+#[tauri::command]
+async fn pick_models(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<ModelRef>, String> {
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Select 3D models")
+        .add_filter("3D models", EXTENSIONS)
+        .blocking_pick_files()
+        .unwrap_or_default();
+    let mut models = Vec::new();
+    for file in picked {
+        let path = file.into_path().map_err(|e| e.to_string())?;
+        if is_supported(&path) {
+            models.push(model_ref(&state, &path)?);
+        }
+    }
+    Ok(models)
+}
+
+#[tauri::command]
+async fn pick_output_folder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Choose where to save preview images")
+        .blocking_pick_folder();
+    let Some(folder) = picked else {
+        return Ok(None);
+    };
+    let path = std::path::absolute(folder.into_path().map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    state.output_dirs.lock().unwrap().insert(path.clone());
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+/// Image extensions `write_image` may create.
+const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg"];
+
+/// Where `write_image` may write `path`: inside a folder the user picked as an output
+/// location, or directly next to a model the user opened (the "next to each model" option).
+fn may_write(state: &AppState, path: &Path) -> bool {
+    let is_image = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| IMAGE_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+        .unwrap_or(false);
+    if !is_image || path.components().any(|c| matches!(c, Component::ParentDir)) {
+        return false;
+    }
+    let Some(parent) = path.parent() else {
+        return false;
+    };
+    state.output_dirs.lock().unwrap().iter().any(|d| path.starts_with(d))
+        || state.allowed_dirs.lock().unwrap().contains(parent)
+}
+
+/// Saves a generated preview image. The body is the raw image bytes; the `x-path` header is
+/// the percent-encoded absolute target path and `x-overwrite: 1` allows replacing a file.
+/// Returns "written", or "exists" when the file exists and overwriting is off.
+#[tauri::command]
+fn write_image(state: State<'_, AppState>, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Expected raw image bytes".into());
+    };
+    let header = |name: &str| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned)
+    };
+    let encoded = header("x-path").ok_or("Missing x-path header")?;
+    let path = PathBuf::from(
+        percent_decode_str(&encoded)
+            .decode_utf8()
+            .map_err(|e| e.to_string())?
+            .into_owned(),
+    );
+    if !path.is_absolute() || !may_write(&state, &path) {
+        return Err(format!("Not allowed to write {}", path.display()));
+    }
+    let overwrite = header("x-overwrite").as_deref() == Some("1");
+    if !overwrite && path.exists() {
+        return Ok("exists".into());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok("written".into())
 }
 
 fn content_type(path: &Path) -> &'static str {
@@ -214,7 +314,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             initial_model,
             open_path,
-            pick_model
+            pick_model,
+            pick_models,
+            pick_output_folder,
+            write_image
         ])
         .run(tauri::generate_context!())
         .expect("error while running Babylon Viewer");
@@ -231,6 +334,20 @@ mod tests {
             let url = format!("/{}/file.stl", encode_dir(&dir));
             assert_eq!(decode_url_path(&url).unwrap(), dir.join("file.stl"));
         }
+    }
+
+    #[test]
+    fn write_image_only_into_allowed_folders() {
+        let state = AppState::default();
+        state.output_dirs.lock().unwrap().insert(PathBuf::from(r"C:\Out"));
+        state.allowed_dirs.lock().unwrap().insert(PathBuf::from(r"C:\Models"));
+        assert!(may_write(&state, Path::new(r"C:\Out\a.png")));
+        assert!(may_write(&state, Path::new(r"C:\Out\sub\a.JPG")));
+        assert!(may_write(&state, Path::new(r"C:\Models\a.jpeg")));
+        assert!(!may_write(&state, Path::new(r"C:\Models\sub\a.png")));
+        assert!(!may_write(&state, Path::new(r"C:\Out\a.exe")));
+        assert!(!may_write(&state, Path::new(r"C:\Out\..\a.png")));
+        assert!(!may_write(&state, Path::new(r"C:\Other\a.png")));
     }
 
     #[test]

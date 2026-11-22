@@ -1,3 +1,4 @@
+import { createBatchDialog } from "./batch";
 import { createHost, type Host } from "./host";
 import { setCadQuality } from "./stepLoader";
 import { extensionOf, ModelViewer, SUPPORTED_EXTENSIONS, type ModelSource, type ModelStats } from "./viewer";
@@ -106,6 +107,45 @@ function toggle(button: HTMLElement, on: boolean): void {
     button.setAttribute("aria-pressed", String(on));
 }
 
+/** The toolbar's Tools dropdown. */
+function setupToolsMenu(onGeneratePreviews: () => void): void {
+    const button = $("btn-tools");
+    const menu = $("tools-menu");
+    const items = () => Array.from(menu.querySelectorAll<HTMLButtonElement>(".menu-item"));
+    const setOpen = (open: boolean, focusFirst = false) => {
+        menu.hidden = !open;
+        button.setAttribute("aria-expanded", String(open));
+        if (open && focusFirst) items()[0]?.focus();
+    };
+    button.addEventListener("click", () => setOpen(menu.hidden !== false, true));
+    button.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setOpen(true, true);
+        }
+    });
+    menu.addEventListener("keydown", (e) => {
+        const list = items();
+        const i = list.indexOf(document.activeElement as HTMLButtonElement);
+        if (e.key === "Escape") {
+            e.stopPropagation();
+            setOpen(false);
+            button.focus();
+        } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            const next = (i + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length;
+            list[next]?.focus();
+        }
+    });
+    document.addEventListener("pointerdown", (e) => {
+        if (!menu.hidden && !(e.target instanceof Node && button.parentElement!.contains(e.target))) setOpen(false);
+    });
+    $("mi-batch").addEventListener("click", () => {
+        setOpen(false);
+        onGeneratePreviews();
+    });
+}
+
 async function main(): Promise<void> {
     const host: Host = await createHost();
     app.dataset.mode = host.mode;
@@ -120,6 +160,10 @@ async function main(): Promise<void> {
         document.body.style.background = hostBg ?? "";
         viewer.setBackground(hostBg ?? getComputedStyle(document.documentElement).getPropertyValue("--bg").trim());
     });
+
+    const themeBackground = () => getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    const batch = host.pickModels && host.saveImage ? createBatchDialog(host, themeBackground) : null;
+    setupToolsMenu(() => batch?.open());
 
     $("formats").textContent = "Supported: " + SUPPORTED_EXTENSIONS.map((e) => e.slice(1).toUpperCase()).join(", ");
     fileInput.accept = SUPPORTED_EXTENSIONS.join(",") + ",.bin,.png,.jpg,.jpeg,.webp,.ktx2,.mtl";
@@ -181,6 +225,10 @@ async function main(): Promise<void> {
         const openPath = host.openPath;
         host.onDropPaths(
             (paths) => {
+                if (batch?.isOpen) {
+                    void batch.addPaths(paths);
+                    return;
+                }
                 const path = paths.find((p) => SUPPORTED_EXTENSIONS.includes(extensionOf(p)));
                 if (path) void openPath(path).then(open, (e) => showError(String(e)));
                 else if (paths.length) showError("That file type isn't supported.");
@@ -190,6 +238,7 @@ async function main(): Promise<void> {
     } else if (host.mode === "browser") {
         document.addEventListener("dragover", (e) => {
             e.preventDefault();
+            if (batch?.isOpen) return;
             dropOverlay.hidden = false;
         });
         document.addEventListener("dragleave", (e) => {
@@ -229,6 +278,8 @@ async function main(): Promise<void> {
 
     window.addEventListener("keydown", (e) => {
         if (e.target instanceof HTMLSelectElement) return;
+        // Shortcuts belong to the main view, not to an open dialog.
+        if (batch?.isOpen) return;
         const key = e.key.toLowerCase();
         if ((e.ctrlKey || e.metaKey) && key === "o" && host.mode !== "preview") {
             e.preventDefault();

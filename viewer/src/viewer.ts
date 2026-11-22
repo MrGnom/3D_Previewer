@@ -1,6 +1,7 @@
 import {
     AbstractMesh,
     ArcRotateCamera,
+    CreateScreenshotUsingRenderTargetAsync,
     AssetContainer,
     Color3,
     Color4,
@@ -51,6 +52,31 @@ export interface ModelStats {
     animations: string[];
 }
 
+export type ViewPreset = "iso" | "front" | "back" | "left" | "right" | "top" | "bottom";
+
+const POLE = 1e-3;
+const VIEW_ANGLES: Record<ViewPreset, { alpha: number; beta: number }> = {
+    iso: { alpha: -Math.PI / 2 + 0.6, beta: Math.PI / 2 - 0.4 },
+    front: { alpha: -Math.PI / 2, beta: Math.PI / 2 },
+    back: { alpha: Math.PI / 2, beta: Math.PI / 2 },
+    left: { alpha: Math.PI, beta: Math.PI / 2 },
+    right: { alpha: 0, beta: Math.PI / 2 },
+    top: { alpha: -Math.PI / 2, beta: POLE },
+    bottom: { alpha: -Math.PI / 2, beta: Math.PI - POLE },
+};
+
+export interface RenderImageOptions {
+    width: number;
+    height: number;
+    mimeType: "image/png" | "image/jpeg";
+    /** JPEG quality, 0..1. */
+    quality?: number;
+    /** #rrggbb, or null for a transparent background (PNG only). */
+    background: string | null;
+    view: ViewPreset;
+    grid: boolean;
+}
+
 export const SUPPORTED_EXTENSIONS = [
     ".stl", ".obj", ".glb", ".gltf", ".fbx", ".ply", ".splat", ".spz", ".sog",
     ".babylon", ".usdz", ".usd", ".usda", ".usdc", ".bvh", ...CAD_EXTENSIONS,
@@ -78,22 +104,29 @@ export class ModelViewer {
     private readonly keyLight: DirectionalLight;
     private dirtyUntil = 0;
     private loadToken = 0;
-    private homeAlpha = -Math.PI / 2 + 0.6;
-    private homeBeta = Math.PI / 2 - 0.4;
+    private homeAlpha = VIEW_ANGLES.iso.alpha;
+    private homeBeta = VIEW_ANGLES.iso.beta;
     private modelMin = Vector3.Zero();
     private modelMax = Vector3.Zero();
 
     gridVisible = true;
 
-    constructor(canvas: HTMLCanvasElement) {
-        this.engine = new Engine(canvas, true, { stencil: true, antialias: true, adaptToDeviceRatio: true }, true);
+    /**
+     * @param options.interactive false for an off-screen viewer that only renders images
+     *   (no camera input, no resize handling, no on-screen rendering).
+     */
+    constructor(canvas: HTMLCanvasElement, options: { interactive?: boolean } = {}) {
+        const interactive = options.interactive ?? true;
+        this.engine = new Engine(canvas, true, { stencil: true, antialias: true, adaptToDeviceRatio: interactive }, interactive);
         const scene = (this.scene = new Scene(this.engine));
         scene.clearColor = new Color4(0.12, 0.12, 0.13, 1);
         scene.imageProcessingConfiguration.toneMappingEnabled = true;
         scene.imageProcessingConfiguration.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL;
 
         const camera = (this.camera = new ArcRotateCamera("camera", this.homeAlpha, this.homeBeta, 5, Vector3.Zero(), scene));
-        camera.attachControl(canvas, true);
+        if (interactive) {
+            camera.attachControl(canvas, true);
+        }
         camera.wheelDeltaPercentage = 0.01;
         camera.pinchDeltaPercentage = 0.01;
         camera.useNaturalPinchZoom = true;
@@ -140,6 +173,13 @@ export class ModelViewer {
             const fwd = camera.getForwardRay().direction;
             this.keyLight.direction = new Vector3(fwd.x - 0.3, fwd.y - 0.6, fwd.z).normalize();
         });
+
+        if (!interactive) {
+            // Nothing to draw on screen, but the loop must tick: render-target screenshots
+            // finish on the engine's end-of-frame event.
+            this.engine.runRenderLoop(() => {});
+            return;
+        }
 
         for (const evt of ["pointerdown", "pointermove", "wheel", "keydown"]) {
             canvas.addEventListener(evt, () => this.invalidate(1000), { passive: true });
@@ -278,13 +318,15 @@ export class ModelViewer {
         return true;
     }
 
-    /** Frames the model. With `resetAngles`, also returns to the default 3/4 view. */
-    frame(resetAngles = false): void {
+    /**
+     * Frames the model. With `resetAngles`, also returns to the default 3/4 view.
+     * `aspect` overrides the canvas aspect ratio (for rendering images of another shape).
+     */
+    frame(resetAngles = false, aspect = this.engine.getAspectRatio(this.camera) || 1): void {
         this.computeBounds();
         const cam = this.camera;
         const center = this.modelMin.add(this.modelMax).scale(0.5);
         const radius = Math.max(this.modelMax.subtract(this.modelMin).length() / 2, 1e-6);
-        const aspect = this.engine.getAspectRatio(cam) || 1;
         const halfFov = Math.min(cam.fov / 2, Math.atan(Math.tan(cam.fov / 2) * aspect));
         const distance = (radius / Math.sin(halfFov)) * 1.02;
 
@@ -330,6 +372,61 @@ export class ModelViewer {
         this.gridVisible = visible;
         this.grid?.setEnabled(visible && this.hasModel);
         this.invalidate();
+    }
+
+    /** Largest image side this GPU can render in one pass. */
+    get maxImageSize(): number {
+        return this.engine.getCaps().maxRenderTextureSize || this.engine.getCaps().maxTextureSize || 4096;
+    }
+
+    /**
+     * Renders the loaded model off-screen at the requested size and returns the encoded image.
+     * The model is re-framed for the image's aspect ratio from the requested view.
+     */
+    async renderImage(options: RenderImageOptions): Promise<Blob> {
+        const { width, height, mimeType, quality, background, view, grid } = options;
+        const max = this.maxImageSize;
+        if (width < 1 || height < 1 || width > max || height > max) {
+            throw new Error(`Image size must be between 1 and ${max} pixels per side.`);
+        }
+
+        const angles = VIEW_ANGLES[view];
+        this.homeAlpha = angles.alpha;
+        this.homeBeta = angles.beta;
+        this.setGridVisible(grid);
+        // JPEG has no alpha channel: fall back to an opaque background.
+        const bg = background ?? (mimeType === "image/jpeg" ? "#ffffff" : null);
+        // setBackground also picks grid line colors; a mid grey suits a transparent image.
+        this.setBackground(bg ?? "#808080");
+        if (!bg) {
+            this.scene.clearColor = new Color4(0, 0, 0, 0);
+        }
+        this.frame(true, width / height);
+
+        await new Promise<void>((resolve) => this.scene.executeWhenReady(() => resolve()));
+        const samples = this.engine.webGLVersion >= 2 ? 4 : 1;
+        const dataUrl = await CreateScreenshotUsingRenderTargetAsync(
+            this.engine,
+            this.camera,
+            { width, height },
+            mimeType,
+            samples,
+            samples === 1,
+            undefined,
+            false,
+            false,
+            true,
+            quality,
+        );
+        if (!dataUrl) {
+            throw new Error("Rendering produced no image.");
+        }
+        return (await fetch(dataUrl)).blob();
+    }
+
+    dispose(): void {
+        this.clear();
+        this.engine.dispose();
     }
 
     setWireframe(on: boolean): void {
