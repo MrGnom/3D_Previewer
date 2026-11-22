@@ -1,4 +1,15 @@
-import type { ModelSource, UrlModelSource } from "./viewer";
+import { extensionOf, SUPPORTED_EXTENSIONS, type ModelSource, type UrlModelSource } from "./viewer";
+
+/** A model queued for preview image generation. */
+export interface BatchModel {
+    source: ModelSource;
+    /** File name, e.g. "part.step". */
+    name: string;
+    /** Absolute path on disk (app only); used for the "next to each model" output option. */
+    path?: string;
+}
+
+export type WriteResult = "written" | "exists";
 
 /**
  * The viewer bundle runs in three hosts:
@@ -19,6 +30,18 @@ export interface Host {
     background?: string;
     /** Calls `apply` with the system theme now and again whenever it changes. */
     watchTheme(apply: (dark: boolean) => void): void;
+
+    /** Lets the user pick several models for preview image generation. */
+    pickModels?(): Promise<BatchModel[]>;
+    /** Lets the user pick an output folder (app only). Returns its absolute path. */
+    pickOutputFolder?(): Promise<string | null>;
+    /**
+     * Saves a generated image. In the app `target` is an absolute path; in a browser it is
+     * downloaded under the file name part of `target`.
+     */
+    saveImage?(target: string, image: Blob, overwrite: boolean): Promise<WriteResult>;
+    /** True when images are written to disk (and output folders are available). */
+    writesToDisk?: boolean;
 }
 
 /** Follows `prefers-color-scheme`, which WebView2 derives from the Windows app theme. */
@@ -32,10 +55,42 @@ interface NativeModelRef {
     rootUrl: string;
     fileName: string;
     displayName: string;
+    path: string;
 }
 
 function fromNative(ref: NativeModelRef | null): UrlModelSource | null {
-    return ref ? { kind: "url", ...ref } : null;
+    return ref ? { kind: "url", rootUrl: ref.rootUrl, fileName: ref.fileName, displayName: ref.displayName } : null;
+}
+
+/** Opens the browser's file picker for several files. Resolves with [] when cancelled. */
+function pickBrowserFiles(accept: string): Promise<File[]> {
+    return new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.accept = accept;
+        input.addEventListener("change", () => resolve(Array.from(input.files ?? [])));
+        input.addEventListener("cancel", () => resolve([]));
+        input.click();
+    });
+}
+
+/** Each supported file becomes a model; the other picked files (textures, .bin, .mtl) are shared side files. */
+async function pickBrowserModels(): Promise<BatchModel[]> {
+    const files = await pickBrowserFiles(SUPPORTED_EXTENSIONS.join(",") + ",.bin,.png,.jpg,.jpeg,.webp,.ktx2,.mtl");
+    return files
+        .filter((f) => SUPPORTED_EXTENSIONS.includes(extensionOf(f.name)))
+        .map((main) => ({ name: main.name, source: { kind: "files", main, all: files, displayName: main.name } }));
+}
+
+async function downloadImage(target: string, image: Blob): Promise<WriteResult> {
+    const url = URL.createObjectURL(image);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = target.split(/[\\/]/).pop() || "preview.png";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return "written";
 }
 
 async function createAppHost(): Promise<Host> {
@@ -48,6 +103,18 @@ async function createAppHost(): Promise<Host> {
         initialModel: async () => fromNative(await invoke<NativeModelRef | null>("initial_model")),
         pickModel: async () => fromNative(await invoke<NativeModelRef | null>("pick_model")),
         openPath: async (path) => fromNative(await invoke<NativeModelRef | null>("open_path", { path })),
+        writesToDisk: true,
+        pickModels: async () =>
+            (await invoke<NativeModelRef[]>("pick_models")).map((ref) => ({
+                source: fromNative(ref)!,
+                name: ref.displayName,
+                path: ref.path,
+            })),
+        pickOutputFolder: () => invoke<string | null>("pick_output_folder"),
+        saveImage: async (target, image, overwrite) =>
+            invoke<WriteResult>("write_image", new Uint8Array(await image.arrayBuffer()), {
+                headers: { "x-path": encodeURIComponent(target), "x-overwrite": overwrite ? "1" : "0" },
+            }),
         onDropPaths(handler, onHover) {
             void getCurrentWebview().onDragDropEvent((event) => {
                 const p = event.payload;
@@ -128,6 +195,8 @@ function createBrowserHost(params: URLSearchParams): Host {
         watchTheme(apply) {
             watchMediaTheme(apply);
         },
+        pickModels: pickBrowserModels,
+        saveImage: downloadImage,
     };
 }
 
